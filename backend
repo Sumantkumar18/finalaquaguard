@@ -1,0 +1,114 @@
+// server.js
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+
+const app = express();
+app.use(cors());
+app.use(bodyParser.json());
+
+const samplesData = [
+  {
+    name: 'Sample A',
+    source: 'Municipal Supply',
+    status: 'potable',
+    parameters: { pH: 7.2, temperature: 25.5, TDS: 311.8, turbidity: 1.7, dissolvedO2: 7.5 },
+    minerals: [
+      { name: 'Calcium (Ca²⁺)', value: 42, safe: 75, max: 200 },
+      { name: 'Magnesium (Mg²⁺)', value: 18, safe: 30, max: 100 },
+      { name: 'Sodium (Na⁺)', value: 85, safe: 200, max: 400 },
+      { name: 'Iron (Fe)', value: 0.12, safe: 0.3, max: 1 },
+      { name: 'Fluoride (F⁻)', value: 1.8, safe: 1.5, max: 3 },
+      { name: 'Chloride (Cl⁻)', value: 128, safe: 250, max: 600 },
+      { name: 'Nitrate (NO₃⁻)', value: 8, safe: 45, max: 100 },
+      { name: 'Lead (Pb)', value: 0.005, safe: 0.01, max: 0.05 }
+    ],
+    diseases: [
+      { name: 'Cholera', desc: 'High bacterial contamination', risk: 'low' },
+      { name: 'Typhoid', desc: 'Salmonella in untreated water', risk: 'low' },
+      { name: 'Dysentery', desc: 'Low pH & high turbidity', risk: 'medium' },
+      { name: 'Lead Poisoning', desc: 'Heavy metal contamination', risk: 'low' },
+      { name: 'Fluorosis', desc: 'Excess fluoride levels', risk: 'medium' },
+      { name: 'Hepatitis A', desc: 'Viral waterborne pathogen', risk: 'low' }
+    ]
+  },
+  {
+    name: 'Sample B',
+    source: 'Borewell Water',
+    status: 'caution',
+    parameters: { pH: 6.8, temperature: 27, TDS: 450, turbidity: 3, dissolvedO2: 6.2 },
+    minerals: [
+      { name: 'Calcium (Ca²⁺)', value: 55, safe: 75, max: 200 },
+      { name: 'Magnesium (Mg²⁺)', value: 25, safe: 30, max: 100 },
+      { name: 'Sodium (Na⁺)', value: 110, safe: 200, max: 400 },
+      { name: 'Iron (Fe)', value: 0.4, safe: 0.3, max: 1 },
+      { name: 'Fluoride (F⁻)', value: 2.2, safe: 1.5, max: 3 },
+      { name: 'Chloride (Cl⁻)', value: 140, safe: 250, max: 600 },
+      { name: 'Nitrate (NO₃⁻)', value: 12, safe: 45, max: 100 },
+      { name: 'Lead (Pb)', value: 0.008, safe: 0.01, max: 0.05 }
+    ],
+    diseases: [
+      { name: 'Cholera', desc: 'High bacterial contamination', risk: 'medium' },
+      { name: 'Typhoid', desc: 'Salmonella in untreated water', risk: 'medium' },
+      { name: 'Dysentery', desc: 'Low pH & high turbidity', risk: 'medium' },
+      { name: 'Lead Poisoning', desc: 'Heavy metal contamination', risk: 'medium' },
+      { name: 'Fluorosis', desc: 'Excess fluoride levels', risk: 'high' },
+      { name: 'Hepatitis A', desc: 'Viral waterborne pathogen', risk: 'low' }
+    ]
+  },
+  {
+    name: 'Sample C',
+    source: 'River Source',
+    status: 'unsafe',
+    parameters: { pH: 5.5, temperature: 28, TDS: 800, turbidity: 10, dissolvedO2: 3.5 },
+    minerals: [
+      { name: 'Calcium (Ca²⁺)', value: 90, safe: 75, max: 200 },
+      { name: 'Magnesium (Mg²⁺)', value: 40, safe: 30, max: 100 },
+      { name: 'Sodium (Na⁺)', value: 250, safe: 200, max: 400 },
+      { name: 'Iron (Fe)', value: 0.8, safe: 0.3, max: 1 },
+      { name: 'Fluoride (F⁻)', value: 3.5, safe: 1.5, max: 3 },
+      { name: 'Chloride (Cl⁻)', value: 300, safe: 250, max: 600 },
+      { name: 'Nitrate (NO₃⁻)', value: 40, safe: 45, max: 100 },
+      { name: 'Lead (Pb)', value: 0.03, safe: 0.01, max: 0.05 }
+    ],
+    diseases: [
+      { name: 'Cholera', desc: 'High bacterial contamination', risk: 'high' },
+      { name: 'Typhoid', desc: 'Salmonella in untreated water', risk: 'high' },
+      { name: 'Dysentery', desc: 'Low pH & high turbidity', risk: 'high' },
+      { name: 'Lead Poisoning', desc: 'Heavy metal contamination', risk: 'high' },
+      { name: 'Fluorosis', desc: 'Excess fluoride levels', risk: 'high' },
+      { name: 'Hepatitis A', desc: 'Viral waterborne pathogen', risk: 'medium' }
+    ]
+  }
+];
+
+// API: Get all samples
+app.get('/api/samples', (req, res) => {
+  res.json(samplesData);
+});
+
+// Chatbot FAQ
+const faq = [
+  { question: /how to reduce turbidity/i, answer: 'Use sand filters, coagulation, or activated carbon filters to reduce turbidity.' },
+  { question: /safe ph level/i, answer: 'Safe pH level for drinking water is generally between 6.5 and 8.5.' },
+  { question: /remove fluoride/i, answer: 'Fluoride can be removed using activated alumina filters, reverse osmosis, or distillation.' },
+  { question: /symptoms of lead poisoning/i, answer: 'Symptoms include headaches, abdominal pain, memory problems, and developmental delays.' },
+  { question: /test water purity/i, answer: 'Water purity can be tested using sensors for pH, turbidity, TDS, and specific pathogen tests.' },
+  { question: /why is water turbid/i, answer: 'Turbidity arises from suspended particles like clay, silt, microorganisms, and organic matter.' },
+  { question: /how to prevent cholera/i, answer: 'Consume treated or boiled water and maintain good sanitation and hygiene.' },
+  { question: /waterborne diseases/i, answer: 'Common diseases include cholera, typhoid, dysentery, lead poisoning, fluorosis, and hepatitis A.' }
+];
+
+// API: Chatbot query
+app.post('/api/chat', (req, res) => {
+  const { question } = req.body;
+  if (!question) return res.status(400).json({ error: 'Question is required' });
+
+  const matched = faq.find(item => item.question.test(question));
+  res.json({ answer: matched ? matched.answer : "Sorry, I don't have an answer for that. Please try rephrasing." });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`AquaGuard backend running on port ${PORT}`);
+});
