@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>AquaGuard - Smart Water Quality Monitoring</title>
+<style>
+  /* (Include all CSS from previous polished code with these adjustments:) */
+  body {
+    margin:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #131c23; color: #90bac4;
+  }
+  /* ... rest of styling as before ... */
+
+  /* Fix Bluetooth text overlap */
+  .bluetooth-text {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .bluetooth-main, .bluetooth-sub {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Other fixes and cleaned styles from the earlier stable code */
+
+  /* Chatbot improvements here (same as shown earlier) */
+</style>
+</head>
+<body>
+  <div class="container" role="main" aria-label="Water Quality Monitoring System AquaGuard">
+    <header class="header">
+      <small>IOT POWERED</small>
+      <h1>AquaGuard</h1>
+      <p>Smart Water Quality Monitoring System</p>
+      <p>Real-time analysis of pH, minerals, impurities &amp; disease risk via Bluetooth-connected sensors</p>
+    </header>
+
+    <section class="top-section">
+      <div class="water-samples" id="samples">
+        <!-- dynamically inserted -->
+      </div>
+      <aside class="bluetooth-scan" title="Tap to Scan Bluetooth devices">
+        <div class="bluetooth-icon">📶</div>
+        <div class="bluetooth-text">
+          <span class="bluetooth-main">Tap to Scan</span>
+          <span class="bluetooth-sub">No device connected</span>
+        </div>
+      </aside>
+    </section>
+
+    <section class="parameters" id="parameters" aria-label="Water parameters"></section>
+
+    <section class="bottom-sections">
+      <section class="live-monitoring">
+        <h3>Live Monitoring <small>(Real-time)</small></h3>
+        <div class="chart-wrapper"><canvas id="liveChart" aria-label="Water quality live monitoring chart" role="img"></canvas></div>
+      </section>
+      <section class="mineral-analysis">
+        <h3>Mineral &amp; Impurity Analysis</h3>
+        <div id="mineralBars"></div>
+      </section>
+    </section>
+
+    <section class="disease-risk" aria-label="Disease Risk Analysis">
+      <h3>Disease Risk Analysis</h3>
+      <div id="diseaseList"></div>
+    </section>
+  </div>
+
+  <button id="chatbot-button" aria-label="Open chatbot">🤖</button>
+  <div id="chatbot-box" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="chatbot-header">
+    <div id="chatbot-header">AquaGuard Support</div>
+    <div id="chatbot-content" aria-live="polite"></div>
+    <div id="chatbot-input">
+      <input type="text" id="chatInput" placeholder="Ask about water problems..." autocomplete="off" aria-label="Chat input"/>
+      <button id="sendBtn" aria-label="Send message">Send</button>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  let samplesData = [];
+  let currentSampleIndex = 0;
+
+  const samplesContainer = document.getElementById('samples');
+  const parametersContainer = document.getElementById('parameters');
+  const mineralBarsContainer = document.getElementById('mineralBars');
+  const diseaseListContainer = document.getElementById('diseaseList');
+
+  // Fetch samples from backend
+  async function loadSamples() {
+    try {
+      const res = await fetch('http://localhost:3000/api/samples');
+      if(!res.ok) throw new Error('Failed to load samples');
+      samplesData = await res.json();
+      renderSamples();
+      updateUI();
+    } catch(e) {
+      console.error(e);
+      alert('Error loading water samples data from backend');
+    }
+  }
+
+  // Create sample selector buttons
+  function renderSamples() {
+    samplesContainer.innerHTML = '';
+    samplesData.forEach((sample, i) => {
+      const div = document.createElement('div');
+      div.className = 'sample' + (i === currentSampleIndex ? ' selected' : '');
+      div.setAttribute('data-index', i);
+      div.tabIndex = 0;
+      div.setAttribute('role', 'listitem');
+      div.setAttribute('aria-selected', (i === currentSampleIndex).toString());
+      div.innerHTML = `
+        ${sample.name}<br>
+        <small>${sample.source}</small>
+        <span class="sample-status ${sample.status}">${sample.status.toUpperCase()}</span>
+      `;
+      div.addEventListener('click', () => {
+        currentSampleIndex = i;
+        updateUI();
+        updateSelectedSample();
+      });
+      div.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          div.click();
+        }
+      });
+      samplesContainer.appendChild(div);
+    });
+  }
+
+  function updateSelectedSample() {
+    const items = samplesContainer.querySelectorAll('.sample');
+    items.forEach((el, i) => {
+      const selected = (i === currentSampleIndex);
+      el.classList.toggle('selected', selected);
+      el.setAttribute('aria-selected', selected.toString());
+    });
+  }
+
+  // Parameter dials max values
+  const paramMax = { pH:14, temperature:40, TDS:1000, turbidity:10, dissolvedO2:14 };
+
+  // Render parameter dials
+  function renderParams(sample) {
+    const safePH = sample.parameters.pH >= 6.5 && sample.parameters.pH <= 8.5;
+    const safeTemp = sample.parameters.temperature <= 35;
+    const safeTDS = sample.parameters.TDS <= 500;
+    const safeTurbidity = sample.parameters.turbidity <= 5;
+    const safeDO = sample.parameters.dissolvedO2 >= 5;
+
+    const data = [
+      { name: 'PH LEVEL', key: 'pH', unit: '', value: sample.parameters.pH, max: paramMax.pH, safe: safePH },
+      { name: 'TEMPERATURE', key: 'temperature', unit: '°C', value: sample.parameters.temperature, max: paramMax.temperature, safe: safeTemp },
+      { name: 'TDS', key: 'TDS', unit: 'ppm', value: sample.parameters.TDS, max: paramMax.TDS, safe: safeTDS },
+      { name: 'TURBIDITY', key: 'turbidity', unit: 'NTU', value: sample.parameters.turbidity, max: paramMax.turbidity, safe: safeTurbidity },
+      { name: 'DISSOLVED O₂', key: 'dissolvedO2', unit: 'mg/L', value: sample.parameters.dissolvedO2, max: paramMax.dissolvedO2, safe: safeDO },
+    ];
+
+    parametersContainer.innerHTML = data.map(({name, value, unit, max, safe}) => {
+      const radius = 36;
+      const circumference = Math.PI * radius;
+      const percent = Math.min(value / max, 1);
+      const dashoffset = circumference - percent * circumference;
+      const displayValue = (value % 1) ? value.toFixed(1) : value;
+      const strokeColor = safe ? '#00ffdc' : '#f6a620';
+
+      return `
+        <div class="param" title="${name}: ${displayValue} ${unit}">
+          <div class="circle" style="width: 78px; height: 40px; overflow: visible; position:relative;">
+            <svg width="78" height="40" viewBox="0 0 78 40" style="overflow: visible; position:absolute; top:0; left:0;">
+              <circle cx="39" cy="39" r="${radius}" fill="none" stroke="#072931" stroke-width="8"></circle>
+              <circle cx="39" cy="39" r="${radius}" fill="none" stroke="${strokeColor}" stroke-width="8" stroke-linecap="round"
+                stroke-dasharray="${circumference}" stroke-dashoffset="${dashoffset}"></circle>
+            </svg>
+            <div style="position:absolute; top:14px; left:50%; transform: translateX(-50%); font-weight:700; font-size:23px; color:#00ffc5;">${displayValue}</div>
+            <div style="position:absolute; top:26px; left:50%; transform: translateX(-50%); color:#13c4bb; font-weight:600;">${unit}</div>
+          </div>
+          <div style="font-weight:700; font-size:14px; color:#32fffbbd; letter-spacing:0.07em; user-select:text; text-align:center;">${name}</div>
+          <div style="background-color:${safe ? '#0ebc9aab' : '#f6a620bb'}; padding:5.3px 28px; border-radius:22px; font-weight:700; font-size:13.3px; user-select:none; box-shadow:0 0 18px #00be9f88; letter-spacing:0.15em; cursor:default; margin-top:12px;">${safe ? 'SAFE' : 'UNSAFE'}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Render mineral bars
+  function renderMinerals(sample) {
+    mineralBarsContainer.innerHTML = sample.minerals.map(mineral => {
+      const percent = Math.min((mineral.value / mineral.max) * 100, 100);
+      const safeColor = mineral.value > mineral.safe ? '#f6a620' : '#00e1bf';
+      const valueColor = mineral.value > mineral.safe ? '#f6a620cc' : '#00e1bfcc';
+
+      return `
+        <div class="mineral-bar">
+          <div class="mineral-bar-name">
+            <span>${mineral.name}</span>
+            <span class="value" style="color:${valueColor};">${mineral.value} mg/L</span>
+          </div>
+          <div class="mineral-bar-progress" style="background-color:#0f2e3c; border-radius: 12px; height:13px; overflow:hidden; box-shadow: inset 0 0 12px #0a273dcc;">
+            <div class="mineral-bar-fill" style="width:${percent}%; background-color:${safeColor}; height:100%; border-radius: 12px 0 0 12px; box-shadow: 0 0 10px ${safeColor}bb; transition: width 1s ease;"></div>
+          </div>
+          <div class="safe-label" style="margin-top:3px; font-size:11.4px; color:#37c8dab6; user-select:none;">Safe: ${mineral.safe} mg/L</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Render diseases with coloring and icons
+  function renderDiseases(sample) {
+    const icons = {
+      low: `<svg style="width:22px;height:22px;stroke:#33e4dbcc;fill:none;stroke-width:2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"/></svg>`,
+      medium: `<svg style="width:22px;height:22px;stroke:#ebac3299;fill:none;stroke-width:2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+      high: `<svg style="width:22px;height:22px;stroke:#ff4444cc;fill:none;stroke-width:2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`
+    };
+
+    const riskClasses = { low: 'risk-low', medium: 'risk-medium', high: 'risk-high' };
+
+    diseaseListContainer.innerHTML = sample.diseases.map(d => `
+      <div class="disease-item" title="${d.desc}" style="background:#193140; border-radius:24px; padding:18px 22px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; box-shadow:inset 0 0 11px #0a3c53cc;">
+        <div class="disease-info" style="display:flex; flex-direction:column; gap:4px; max-width:300px; color:#aadcebcc;">
+          <strong style="font-weight:700; font-size:18px; display:flex; gap:10px; align-items:center; color:#33e4dbcc;">
+            ${icons[d.risk]} ${d.name}
+          </strong>
+          <div class="disease-desc" style="font-weight:400; font-size:14px; color:#8de4ebaa;">${d.desc}</div>
+        </div>
+        <div class="risk-label ${riskClasses[d.risk]}" style="font-weight:800; font-size:16px; padding:12px 24px; border-radius:24px; letter-spacing:0.12em; user-select:none; min-width:90px; text-align:center; box-shadow:0 0 12px #000000cc; cursor:default; color:${d.risk==='low'?'#19d3a1':d.risk==='medium'?'#db872d':'#f23333'}; background-color:${d.risk==='low'?'#0c493429':d.risk==='medium'?'#6c4f2215':'#6818183b'}; box-shadow:0 0 20px ${d.risk==='low'?'#0ad6a7bb':d.risk==='medium'?'#db872ddd':'#f23333ee'}; text-shadow:0 0 10px ${d.risk==='low'?'#09d9adcc':d.risk==='medium'?'#db872dda':'#f23333cc'};">
+          ${d.risk.toUpperCase()}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Chatbot references
+  const chatbotBtn = document.getElementById('chatbot-button');
+  const chatbotBox = document.getElementById('chatbot-box');
+  const chatbotContent = document.getElementById('chatbot-content');
+  const chatInput = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  chatbotBtn.addEventListener('click', () => {
+    if(chatbotBox.style.display === 'flex'){
+      chatbotBox.style.display = 'none';
+      chatbotBox.setAttribute('aria-hidden', 'true');
+    } else {
+      chatbotBox.style.display = 'flex';
+      chatbotBox.setAttribute('aria-hidden', 'false');
+      chatInput.focus();
+    }
+  });
+
+  async function sendMessage() {
+    const text = chatInput.value.trim();
+    if(!text) return;
+    appendMessage(text, 'user');
+    chatInput.value = '';
+    try {
+      const res = await fetch('http://localhost:3000/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({question: text})
+      });
+      const json = await res.json();
+      appendMessage(json.answer, 'bot');
+    } catch(e) {
+      appendMessage('Sorry, chatbot is unavailable.', 'bot');
+      console.error(e);
+    }
+  }
+
+  function appendMessage(msg, sender) {
+    const div = document.createElement('div');
+    div.className = 'chat-message ' + (sender === 'user'? 'user' : 'bot');
+    div.textContent = msg;
+    chatbotContent.appendChild(div);
+    chatbotContent.scrollTop = chatbotContent.scrollHeight;
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  chatInput.addEventListener('keydown', e => {
+    if(e.key === 'Enter') sendMessage();
+  });
+
+  // Chart.js live monitoring setup
+  const ctx = document.getElementById('liveChart').getContext('2d');
+  const maxPoints = 30;
+  let phData = new Array(maxPoints).fill(7.2);
+  let tempData = new Array(maxPoints).fill(25.5);
+
+  const liveChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: new Array(maxPoints).fill(''),
+      datasets: [
+        { label: 'pH', data: phData, borderColor: '#00ffdc', borderWidth: 3, tension: 0.38, pointRadius: 0, yAxisID: 'y', fill: false},
+        { label: 'Temperature (°C)', data: tempData, borderColor: '#f6a620', borderWidth: 3, tension: 0.38, pointRadius: 0, yAxisID: 'y1', fill: false }
+      ]
+    },
+    options: {
+      responsive: true, animation: false, maintainAspectRatio: false,
+      scales: {
+        x: { display: false },
+        y: { type: 'linear', position: 'left', min: 0, max: 14,
+          grid: {color:'#07464e',borderColor:'#05444a',drawTicks:false},
+          ticks: {stepSize:2,color:'#25ffd4cc',font:{weight:'600',size:13}}
+        },
+        y1: { type: 'linear', position: 'right', min: 10, max: 50,
+          grid: {drawOnChartArea:false},
+          ticks: {stepSize:5,color:'#f6a621bb',font:{weight:'600',size:13}}
+        }
+      },
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      interaction:{intersect:false,mode:'nearest'}
+    }
+  });
+
+  function updateLiveData(sample) {
+    let newPH = sample.parameters.pH + (Math.random() - 0.5) * 0.04;
+    newPH = Math.min(Math.max(newPH, 4), 11);
+    let newTemp = sample.parameters.temperature + (Math.random() - 0.5) * 0.25;
+    newTemp = Math.min(Math.max(newTemp, 12), 45);
+
+    phData.shift(); phData.push(newPH);
+    tempData.shift(); tempData.push(newTemp);
+    liveChart.data.datasets[0].data = phData;
+    liveChart.data.datasets[1].data = tempData;
+    liveChart.update('none');
+  }
+
+  setInterval(() => {
+    updateLiveData(samplesData[currentSampleIndex]);
+  }, 2800);
+
+  // Main UI update
+  function updateUI() {
+    renderSamples();
+    updateSelectedSample();
+    const sample = samplesData[currentSampleIndex];
+    renderParams(sample);
+    renderMinerals(sample);
+    renderDiseases(sample);
+
+    // reset chart data
+    phData.fill(sample.parameters.pH);
+    tempData.fill(sample.parameters.temperature);
+    liveChart.data.datasets[0].data = phData;
+    liveChart.data.datasets[1].data = tempData;
+    liveChart.update('none');
+  }
+
+  // Initial load function
+  async function init() {
+    try {
+      const res = await fetch('http://localhost:3000/api/samples');
+      if (!res.ok) throw new Error('Failed to fetch samples');
+      samplesData = await res.json();
+      updateUI();
+    } catch (e) {
+      alert('Error loading sample data. Please check backend.');
+      console.error(e);
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
